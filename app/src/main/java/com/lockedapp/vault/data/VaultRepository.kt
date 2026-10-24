@@ -81,6 +81,36 @@ class VaultRepository(private val context: Context) {
         item.copy(id = id)
     }
 
+    /** A private, non-public location for CameraX to record into — video muxing needs a
+     *  seekable File, so it can't be written straight into EncryptedFile's cipher stream.
+     *  It lives under filesDir (never scanned by MediaStore/Gallery) and is deleted the
+     *  moment [importCapturedVideo] has re-encrypted it into the vault. */
+    fun newPrivateVideoTempFile(): File {
+        val dir = File(context.filesDir, "video_tmp").apply { mkdirs() }
+        return File(dir, "${UUID.randomUUID()}.mp4")
+    }
+
+    suspend fun importCapturedVideo(tempFile: File): VaultItemEntity = withContext(Dispatchers.IO) {
+        val storedFileName = UUID.randomUUID().toString()
+        val target = File(vaultDir, storedFileName)
+        CryptoManager.encryptedFile(context, target).openFileOutput().use { out ->
+            tempFile.inputStream().use { input -> input.copyTo(out) }
+        }
+        val size = tempFile.length()
+        tempFile.delete()
+
+        val item = VaultItemEntity(
+            displayName = "Video_${System.currentTimeMillis()}.mp4",
+            mimeType = "video/mp4",
+            storedFileName = storedFileName,
+            type = VaultItemType.VIDEO,
+            sizeBytes = size,
+            dateAdded = System.currentTimeMillis()
+        )
+        val id = dao.insert(item)
+        item.copy(id = id)
+    }
+
     suspend fun deleteItem(item: VaultItemEntity) = withContext(Dispatchers.IO) {
         File(vaultDir, item.storedFileName).delete()
         dao.delete(item)

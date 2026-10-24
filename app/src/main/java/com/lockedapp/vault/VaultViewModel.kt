@@ -56,6 +56,14 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun newPrivateVideoTempFile() = repository.newPrivateVideoTempFile()
+
+    fun importCapturedVideo(tempFile: java.io.File) {
+        viewModelScope.launch {
+            repository.importCapturedVideo(tempFile)
+        }
+    }
+
     fun deleteItem(item: VaultItemEntity) {
         ThumbnailCache.remove(item.id)
         viewModelScope.launch {

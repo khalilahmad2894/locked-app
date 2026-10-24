@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -30,10 +32,11 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
@@ -74,7 +76,8 @@ fun VaultScreen(
     onOpenPhoto: (startIndex: Int) -> Unit,
     onOpenVideo: (VaultItemEntity) -> Unit,
     onOpenDocument: (VaultItemEntity) -> Unit,
-    onOpenCamera: () -> Unit
+    onOpenCamera: () -> Unit,
+    onOpenVideoRecorder: () -> Unit
 ) {
     var tab by remember { mutableStateOf(VaultTab.PHOTOS) }
     val photos by viewModel.photos.collectAsState()
@@ -88,45 +91,27 @@ fun VaultScreen(
     Scaffold(
         containerColor = VaultVoid,
         topBar = {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "My Vault",
-                        color = Color.White,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (tab == VaultTab.PHOTOS) {
-                            IconButton(
-                                onClick = onOpenCamera,
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(VaultSurfaceElevated)
-                            ) {
-                                Icon(Icons.Filled.CameraAlt, contentDescription = "Take photo", tint = Color.White)
-                            }
-                        }
-                        IconButton(
-                            onClick = { importLauncher.launch(arrayOf("*/*")) },
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(tab.accent, tab.accent.copy(alpha = 0.6f))))
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = "Import", tint = Color.White)
-                        }
-                    }
-                }
-                SegmentedTabs(selected = tab, onSelect = { tab = it })
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                Text(
+                    "My Vault",
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
+        },
+        bottomBar = {
+            VaultBottomBar(
+                selected = tab,
+                onSelect = { tab = it },
+                onCapture = { if (tab == VaultTab.VIDEOS) onOpenVideoRecorder() else onOpenCamera() },
+                onImport = { importLauncher.launch(arrayOf("*/*")) }
+            )
         }
     ) { padding ->
         Box(
@@ -161,34 +146,76 @@ fun VaultScreen(
 }
 
 @Composable
-private fun SegmentedTabs(selected: VaultTab, onSelect: (VaultTab) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp)
-            .background(VaultSurfaceElevated, RoundedCornerShape(16.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        VaultTab.entries.forEach { t ->
-            val isSelected = t == selected
-            Box(
+private fun VaultBottomBar(
+    selected: VaultTab,
+    onSelect: (VaultTab) -> Unit,
+    onCapture: () -> Unit,
+    onImport: () -> Unit
+) {
+    androidx.compose.material3.BottomAppBar(
+        containerColor = VaultSurfaceElevated,
+        contentColor = Color.White,
+        actions = {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) t.accent.copy(alpha = 0.22f) else Color.Transparent)
-                    .clickable { onSelect(t) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(start = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    t.label,
-                    color = if (isSelected) t.accent else Color.White.copy(alpha = 0.5f),
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    fontSize = 14.sp
-                )
+                VaultTab.entries.forEach { t ->
+                    BottomTabItem(tab = t, selected = t == selected, onClick = { onSelect(t) })
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                if (selected != VaultTab.FILES) {
+                    IconButton(onClick = onCapture) {
+                        Icon(
+                            imageVector = if (selected == VaultTab.VIDEOS) Icons.Filled.Videocam else Icons.Filled.CameraAlt,
+                            contentDescription = "Capture",
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+        },
+        floatingActionButton = {
+            androidx.compose.material3.FloatingActionButton(
+                onClick = onImport,
+                containerColor = selected.accent,
+                contentColor = Color.White
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Import file")
             }
         }
+    )
+}
+
+@Composable
+private fun BottomTabItem(tab: VaultTab, selected: Boolean, onClick: () -> Unit) {
+    val icon = when (tab) {
+        VaultTab.PHOTOS -> Icons.Filled.Image
+        VaultTab.VIDEOS -> Icons.Filled.Videocam
+        VaultTab.FILES -> Icons.AutoMirrored.Filled.InsertDriveFile
+    }
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            icon,
+            contentDescription = tab.label,
+            tint = if (selected) tab.accent else Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            tab.label,
+            color = if (selected) tab.accent else Color.White.copy(alpha = 0.5f),
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            fontSize = 11.sp
+        )
     }
 }
 

@@ -18,6 +18,7 @@ import com.lockedapp.vault.ui.screens.SetupPinScreen
 import com.lockedapp.vault.ui.screens.UnlockScreen
 import com.lockedapp.vault.ui.screens.VaultScreen
 import com.lockedapp.vault.ui.screens.VideoPlayerScreen
+import com.lockedapp.vault.ui.screens.VideoRecordScreen
 import com.lockedapp.vault.ui.theme.LockedVaultTheme
 import kotlinx.coroutines.launch
 
@@ -82,11 +83,15 @@ private fun VaultApp(viewModel: VaultViewModel) {
                         ContextCompat.startActivity(context, intent, null)
                     }
                 },
-                onOpenCamera = { navController.navigate("camera") }
+                onOpenCamera = { navController.navigate("camera") },
+                onOpenVideoRecorder = { navController.navigate("videoRecorder") }
             )
         }
         composable("camera") {
             CameraCaptureScreen(viewModel = viewModel, onDone = { navController.popBackStack() })
+        }
+        composable("videoRecorder") {
+            VideoRecordScreen(viewModel = viewModel, onDone = { navController.popBackStack() })
         }
         composable("photoViewer") {
             PhotoViewerScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

@@ -50,6 +50,12 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun importCapturedPhoto(jpegBytes: ByteArray) {
+        viewModelScope.launch {
+            repository.importCapturedPhoto(jpegBytes)
+        }
+    }
+
     fun deleteItem(item: VaultItemEntity) {
         ThumbnailCache.remove(item.id)
         viewModelScope.launch {

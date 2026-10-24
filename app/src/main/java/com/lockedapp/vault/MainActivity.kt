@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.lockedapp.vault.ui.screens.CameraCaptureScreen
 import com.lockedapp.vault.ui.screens.PhotoViewerScreen
 import com.lockedapp.vault.ui.screens.SetupPinScreen
 import com.lockedapp.vault.ui.screens.UnlockScreen
@@ -80,8 +81,12 @@ private fun VaultApp(viewModel: VaultViewModel) {
                         }
                         ContextCompat.startActivity(context, intent, null)
                     }
-                }
+                },
+                onOpenCamera = { navController.navigate("camera") }
             )
+        }
+        composable("camera") {
+            CameraCaptureScreen(viewModel = viewModel, onDone = { navController.popBackStack() })
         }
         composable("photoViewer") {
             PhotoViewerScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

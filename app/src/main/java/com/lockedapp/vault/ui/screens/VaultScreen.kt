@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Description
@@ -72,7 +73,8 @@ fun VaultScreen(
     viewModel: VaultViewModel,
     onOpenPhoto: (startIndex: Int) -> Unit,
     onOpenVideo: (VaultItemEntity) -> Unit,
-    onOpenDocument: (VaultItemEntity) -> Unit
+    onOpenDocument: (VaultItemEntity) -> Unit,
+    onOpenCamera: () -> Unit
 ) {
     var tab by remember { mutableStateOf(VaultTab.PHOTOS) }
     val photos by viewModel.photos.collectAsState()
@@ -100,14 +102,27 @@ fun VaultScreen(
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(
-                        onClick = { importLauncher.launch(arrayOf("*/*")) },
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(tab.accent, tab.accent.copy(alpha = 0.6f))))
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Import", tint = Color.White)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (tab == VaultTab.PHOTOS) {
+                            IconButton(
+                                onClick = onOpenCamera,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(VaultSurfaceElevated)
+                            ) {
+                                Icon(Icons.Filled.CameraAlt, contentDescription = "Take photo", tint = Color.White)
+                            }
+                        }
+                        IconButton(
+                            onClick = { importLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(tab.accent, tab.accent.copy(alpha = 0.6f))))
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "Import", tint = Color.White)
+                        }
                     }
                 }
                 SegmentedTabs(selected = tab, onSelect = { tab = it })

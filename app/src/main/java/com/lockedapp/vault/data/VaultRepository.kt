@@ -60,6 +60,27 @@ class VaultRepository(private val context: Context) {
         item.copy(id = id)
     }
 
+    /** Takes JPEG bytes straight from CameraX (already rotated) and writes them encrypted —
+     *  the photo never exists as a plaintext file and is never registered with MediaStore/Gallery. */
+    suspend fun importCapturedPhoto(jpegBytes: ByteArray): VaultItemEntity = withContext(Dispatchers.IO) {
+        val storedFileName = UUID.randomUUID().toString()
+        val target = File(vaultDir, storedFileName)
+        CryptoManager.encryptedFile(context, target).openFileOutput().use { out ->
+            out.write(jpegBytes)
+        }
+
+        val item = VaultItemEntity(
+            displayName = "Camera_${System.currentTimeMillis()}.jpg",
+            mimeType = "image/jpeg",
+            storedFileName = storedFileName,
+            type = VaultItemType.IMAGE,
+            sizeBytes = jpegBytes.size.toLong(),
+            dateAdded = System.currentTimeMillis()
+        )
+        val id = dao.insert(item)
+        item.copy(id = id)
+    }
+
     suspend fun deleteItem(item: VaultItemEntity) = withContext(Dispatchers.IO) {
         File(vaultDir, item.storedFileName).delete()
         dao.delete(item)

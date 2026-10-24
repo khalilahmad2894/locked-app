@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
@@ -14,6 +16,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,20 +31,51 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.lockedapp.vault.VaultViewModel
+import com.lockedapp.vault.data.VaultItemEntity
 
 @Composable
 fun VideoPlayerScreen(viewModel: VaultViewModel, onBack: () -> Unit) {
-    val item = viewModel.activeVideoItem ?: run { onBack(); return }
+    val videos by viewModel.videos.collectAsState()
+    if (videos.isEmpty()) {
+        onBack()
+        return
+    }
+    val startIndex = videos.indexOfFirst { it.id == viewModel.activeVideoItem?.id }.coerceAtLeast(0)
+    val pagerState = rememberPagerState(initialPage = startIndex) { videos.size }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            VideoPage(
+                item = videos[page],
+                isActive = pagerState.currentPage == page,
+                viewModel = viewModel
+            )
+        }
+
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(8.dp)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun VideoPage(item: VaultItemEntity, isActive: Boolean, viewModel: VaultViewModel) {
+    // Each page gets its own player so Compose can create/release them lazily as the
+    // Pager scrolls — only the currently visible page's player is actually playing.
     val context = LocalContext.current
-    var videoUri by remember { mutableStateOf<Uri?>(null) }
+    var videoUri by remember(item.id) { mutableStateOf<Uri?>(null) }
 
     LaunchedEffect(item.id) { videoUri = viewModel.openForViewing(item) }
 
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build()
-    }
+    val exoPlayer = remember(item.id) { ExoPlayer.Builder(context).build() }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(item.id) {
         onDispose { exoPlayer.release() }
     }
 
@@ -49,11 +83,14 @@ fun VideoPlayerScreen(viewModel: VaultViewModel, onBack: () -> Unit) {
         videoUri?.let { uri ->
             exoPlayer.setMediaItem(MediaItem.fromUri(uri))
             exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    LaunchedEffect(isActive) {
+        exoPlayer.playWhenReady = isActive
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         if (videoUri == null) {
             CircularProgressIndicator(
                 color = Color.White,
@@ -69,16 +106,6 @@ fun VideoPlayerScreen(viewModel: VaultViewModel, onBack: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxSize()
             )
-        }
-
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(8.dp)
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
     }
 }

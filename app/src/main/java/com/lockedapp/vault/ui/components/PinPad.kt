@@ -84,7 +84,7 @@ fun NumPad(
         rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(28.dp)
+                horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)
             ) {
                 row.forEach { digit ->
                     NumKey(label = digit.toString()) { onDigit(digit) }
@@ -93,7 +93,7 @@ fun NumPad(
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(28.dp)
+            horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)
         ) {
             Box(modifier = Modifier.size(72.dp))
             NumKey(label = "0") { onDigit('0') }

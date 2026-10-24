@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +50,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.lockedapp.vault.VaultViewModel
 import com.lockedapp.vault.ui.theme.AuroraViolet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 
@@ -122,6 +125,7 @@ private fun PermissionRequest(onRequest: () -> Unit) {
 @Composable
 private fun CameraPreviewWithCapture(onPhotoCaptured: (ByteArray) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
     val imageCapture = remember { ImageCapture.Builder().build() }
     val captureExecutor = remember { Executors.newSingleThreadExecutor() }
 
@@ -166,7 +170,9 @@ private fun CameraPreviewWithCapture(onPhotoCaptured: (ByteArray) -> Unit) {
                             override fun onCaptureSuccess(image: ImageProxy) {
                                 val jpegBytes = imageProxyToUprightJpeg(image)
                                 image.close()
-                                onPhotoCaptured(jpegBytes)
+                                // onCaptureSuccess fires on captureExecutor (background) — navigation
+                                // and view-model calls must hop back to Main before running.
+                                scope.launch(Dispatchers.Main) { onPhotoCaptured(jpegBytes) }
                             }
 
                             override fun onError(exception: ImageCaptureException) {

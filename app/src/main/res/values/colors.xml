@@ -1,5 +1,5 @@
 <resources>
-    <color name="vault_primary">#6750A4</color>
+    <color name="vault_primary">#8B5CF6</color>
     <color name="vault_on_primary">#FFFFFF</color>
-    <color name="vault_background">#1C1B1F</color>
+    <color name="vault_background">#0D0B14</color>
 </resources>

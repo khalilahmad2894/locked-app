@@ -30,12 +30,6 @@ class PinManager(context: Context) {
         return hash(pin, salt) == storedHash
     }
 
-    fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)
-
-    fun setBiometricEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
-    }
-
     private fun hash(pin: String, salt: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(salt)
@@ -51,6 +45,5 @@ class PinManager(context: Context) {
     companion object {
         private const val KEY_SALT = "pin_salt"
         private const val KEY_HASH = "pin_hash"
-        private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     }
 }

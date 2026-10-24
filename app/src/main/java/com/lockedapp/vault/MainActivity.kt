@@ -1,19 +1,26 @@
 package com.lockedapp.vault
 
+import android.content.Intent
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
-import androidx.fragment.app.FragmentActivity
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.lockedapp.vault.ui.screens.PhotoViewerScreen
 import com.lockedapp.vault.ui.screens.SetupPinScreen
 import com.lockedapp.vault.ui.screens.UnlockScreen
 import com.lockedapp.vault.ui.screens.VaultScreen
+import com.lockedapp.vault.ui.screens.VideoPlayerScreen
 import com.lockedapp.vault.ui.theme.LockedVaultTheme
+import kotlinx.coroutines.launch
 
-class MainActivity : FragmentActivity() {
+class MainActivity : ComponentActivity() {
 
     private val viewModel: VaultViewModel by viewModels()
 
@@ -21,15 +28,17 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             LockedVaultTheme {
-                VaultApp(activity = this, viewModel = viewModel)
+                VaultApp(viewModel = viewModel)
             }
         }
     }
 }
 
 @Composable
-private fun VaultApp(activity: FragmentActivity, viewModel: VaultViewModel) {
+private fun VaultApp(viewModel: VaultViewModel) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val startDestination = if (viewModel.pinManager.isPinSet()) "unlock" else "setup"
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -43,7 +52,6 @@ private fun VaultApp(activity: FragmentActivity, viewModel: VaultViewModel) {
         }
         composable("unlock") {
             UnlockScreen(
-                activity = activity,
                 pinManager = viewModel.pinManager,
                 onUnlocked = {
                     navController.navigate("vault") {
@@ -53,7 +61,33 @@ private fun VaultApp(activity: FragmentActivity, viewModel: VaultViewModel) {
             )
         }
         composable("vault") {
-            VaultScreen(activity = activity, viewModel = viewModel)
+            VaultScreen(
+                viewModel = viewModel,
+                onOpenPhoto = { index ->
+                    viewModel.photoViewerStartIndex = index
+                    navController.navigate("photoViewer")
+                },
+                onOpenVideo = { item ->
+                    viewModel.activeVideoItem = item
+                    navController.navigate("videoPlayer")
+                },
+                onOpenDocument = { item ->
+                    scope.launch {
+                        val uri = viewModel.openForViewing(item)
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, item.mimeType)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        ContextCompat.startActivity(context, intent, null)
+                    }
+                }
+            )
+        }
+        composable("photoViewer") {
+            PhotoViewerScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+        }
+        composable("videoPlayer") {
+            VideoPlayerScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
         }
     }
 }

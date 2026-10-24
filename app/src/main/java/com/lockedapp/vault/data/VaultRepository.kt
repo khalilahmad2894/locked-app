@@ -1,6 +1,9 @@
 package com.lockedapp.vault.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
@@ -75,6 +78,41 @@ class VaultRepository(private val context: Context) {
             }
         }
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+    }
+
+    /** Decodes a downsampled bitmap straight from the encrypted stream — no plaintext ever touches disk. */
+    suspend fun decodeImageBitmap(item: VaultItemEntity, maxDimension: Int): Bitmap? =
+        withContext(Dispatchers.IO) {
+            val source = File(vaultDir, item.storedFileName)
+            if (!source.exists()) return@withContext null
+            val encryptedFile = CryptoManager.encryptedFile(context, source)
+
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            encryptedFile.openFileInput().use { BitmapFactory.decodeStream(it, null, bounds) }
+
+            val sample = calculateInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            encryptedFile.openFileInput().use { BitmapFactory.decodeStream(it, null, opts) }
+        }
+
+    /** Extracts a single frame as a thumbnail; briefly decrypts to cache to use MediaMetadataRetriever. */
+    suspend fun decodeVideoThumbnail(item: VaultItemEntity): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val uri = openForViewing(item)
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, uri)
+            val frame = retriever.frameAtTime
+            retriever.release()
+            frame
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun calculateInSampleSize(width: Int, height: Int, reqSize: Int): Int {
+        var sample = 1
+        while (width / sample > reqSize * 2 && height / sample > reqSize * 2) sample *= 2
+        return sample
     }
 
     private fun typeFromMime(mimeType: String): VaultItemType = when {

@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.LockedVault" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/vault_background</item>
+        <item name="android:windowBackground">@color/vault_background</item>
+    </style>
+</resources>

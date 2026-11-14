@@ -51,6 +51,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -83,6 +85,7 @@ import com.lockedapp.vault.ui.theme.PhotosAccent
 import com.lockedapp.vault.ui.theme.VaultSurfaceElevated
 import com.lockedapp.vault.ui.theme.VaultVoid
 import com.lockedapp.vault.ui.theme.VideosAccent
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class VaultTab(val label: String, val accent: Color) {
@@ -577,30 +580,54 @@ private fun NotesList(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val player = remember { androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
-    var playingId by remember { mutableStateOf<Long?>(null) }
+    var activeNoteId by remember { mutableStateOf<Long?>(null) }
+    var isPlayingNow by remember { mutableStateOf(false) }
+    var positionMs by remember { mutableStateOf(0L) }
+    var durationMs by remember { mutableStateOf(0L) }
+    var isDragging by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == androidx.media3.common.Player.STATE_ENDED) playingId = null
+                if (state == androidx.media3.common.Player.STATE_READY) {
+                    durationMs = player.duration.coerceAtLeast(0)
+                }
+                if (state == androidx.media3.common.Player.STATE_ENDED) {
+                    player.seekTo(0)
+                    positionMs = 0L
+                }
+            }
+
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlayingNow = playing
             }
         }
         player.addListener(listener)
         onDispose { player.release() }
     }
 
-    fun toggleVoicePlayback(item: VaultItemEntity) {
-        if (playingId == item.id) {
-            player.pause()
-            playingId = null
+    // Polls the real playback position while something is loaded, but backs off
+    // while the user is dragging the slider so the thumb doesn't jump around.
+    LaunchedEffect(activeNoteId) {
+        while (activeNoteId != null) {
+            if (isPlayingNow && !isDragging) positionMs = player.currentPosition
+            delay(200)
+        }
+    }
+
+    fun onVoiceRowTap(item: VaultItemEntity) {
+        if (activeNoteId == item.id) {
+            if (isPlayingNow) player.pause() else player.play()
         } else {
             scope.launch {
                 val uri = viewModel.openForViewing(item)
                 player.setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
                 player.prepare()
                 player.play()
-                playingId = item.id
+                activeNoteId = item.id
+                positionMs = 0L
+                durationMs = 0L
             }
         }
     }
@@ -613,8 +640,9 @@ private fun NotesList(
         items(items, key = { it.id }) { item ->
             val isSelected = item.id in selectedIds
             val isVoice = item.type == VaultItemType.VOICE_NOTE
-            val isPlaying = isVoice && playingId == item.id
-            Row(
+            val isActive = isVoice && activeNoteId == item.id
+            val isPlaying = isActive && isPlayingNow
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
@@ -623,63 +651,93 @@ private fun NotesList(
                         onClick = {
                             when {
                                 isSelecting -> onToggleSelect(item.id)
-                                isVoice -> toggleVoicePlayback(item)
+                                isVoice -> onVoiceRowTap(item)
                                 else -> onOpenNote(item)
                             }
                         },
                         onLongClick = { onToggleSelect(item.id) }
                     )
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(14.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(accent.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSelecting) {
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(if (isSelected) accent else Color.White.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSelected) {
-                                Icon(Icons.Filled.Check, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(accent.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelecting) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) accent else Color.White.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(Icons.Filled.Check, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(14.dp))
+                                }
                             }
+                        } else {
+                            Icon(
+                                imageVector = when {
+                                    isVoice && isPlaying -> Icons.Filled.Pause
+                                    isVoice -> Icons.Filled.PlayArrow
+                                    else -> Icons.Filled.Edit
+                                },
+                                contentDescription = null,
+                                tint = accent
+                            )
                         }
-                    } else {
-                        Icon(
-                            imageVector = when {
-                                isVoice && isPlaying -> Icons.Filled.Pause
-                                isVoice -> Icons.Filled.PlayArrow
-                                else -> Icons.Filled.Edit
-                            },
-                            contentDescription = null,
-                            tint = accent
+                    }
+                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(
+                            item.displayName,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 15.sp
+                        )
+                        Text(
+                            if (isVoice) "Voice note" else "Text note",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp
                         )
                     }
                 }
-                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(
-                        item.displayName,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = 15.sp
-                    )
-                    Text(
-                        if (isVoice) "Voice note" else "Text note",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 12.sp
-                    )
+                if (isActive) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text(formatDuration(positionMs), color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                        Slider(
+                            value = positionMs.toFloat(),
+                            valueRange = 0f..durationMs.coerceAtLeast(1L).toFloat(),
+                            onValueChange = {
+                                isDragging = true
+                                positionMs = it.toLong()
+                            },
+                            onValueChangeFinished = {
+                                player.seekTo(positionMs)
+                                isDragging = false
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = accent,
+                                activeTrackColor = accent,
+                                inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                            ),
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        )
+                        Text(formatDuration(durationMs), color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                    }
                 }
             }
         }
     }
+}
+
+private fun formatDuration(ms: Long): String {
+    val totalSeconds = ms / 1000
+    return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
 }
 
 @Composable

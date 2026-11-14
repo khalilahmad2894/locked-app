@@ -75,10 +75,10 @@ fun CameraCaptureScreen(viewModel: VaultViewModel, onDone: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (hasPermission) {
             CameraPreviewWithCapture(
-                onPhotoCaptured = { bytes ->
-                    viewModel.importCapturedPhoto(bytes)
-                    onDone()
-                }
+                // Deliberately does NOT call onDone() — the camera stays open so multiple
+                // photos can be captured back-to-back; onDone() is only for the back button.
+                onPhotoCaptured = { bytes -> viewModel.importCapturedPhoto(bytes) },
+                onDone = onDone
             )
         } else {
             PermissionRequest(onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) })
@@ -123,11 +123,13 @@ private fun PermissionRequest(onRequest: () -> Unit) {
 }
 
 @Composable
-private fun CameraPreviewWithCapture(onPhotoCaptured: (ByteArray) -> Unit) {
+private fun CameraPreviewWithCapture(onPhotoCaptured: (ByteArray) -> Unit, onDone: () -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val imageCapture = remember { ImageCapture.Builder().build() }
     val captureExecutor = remember { Executors.newSingleThreadExecutor() }
+    val flashAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
+    var shotCount by remember { mutableStateOf(0) }
 
     DisposableEffect(Unit) {
         onDispose { captureExecutor.shutdown() }
@@ -156,6 +158,39 @@ private fun CameraPreviewWithCapture(onPhotoCaptured: (ByteArray) -> Unit) {
             }
         )
 
+        // Brief white flash as capture feedback, since the screen no longer navigates away.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White.copy(alpha = flashAlpha.value))
+        )
+
+        if (shotCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 16.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text("$shotCount captured", color = Color.White, fontSize = 13.sp)
+            }
+        }
+
+        IconButton(
+            onClick = onDone,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 24.dp, bottom = 48.dp)
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.15f))
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to vault", tint = Color.White)
+        }
+
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -172,7 +207,12 @@ private fun CameraPreviewWithCapture(onPhotoCaptured: (ByteArray) -> Unit) {
                                 image.close()
                                 // onCaptureSuccess fires on captureExecutor (background) — navigation
                                 // and view-model calls must hop back to Main before running.
-                                scope.launch(Dispatchers.Main) { onPhotoCaptured(jpegBytes) }
+                                scope.launch(Dispatchers.Main) {
+                                    onPhotoCaptured(jpegBytes)
+                                    shotCount++
+                                    flashAlpha.snapTo(0.85f)
+                                    flashAlpha.animateTo(0f, androidx.compose.animation.core.tween(220))
+                                }
                             }
 
                             override fun onError(exception: ImageCaptureException) {

@@ -7,7 +7,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -40,10 +38,13 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -160,12 +161,49 @@ fun VaultScreen(
         },
         bottomBar = {
             if (!isSelecting) {
-                VaultBottomBar(
-                    selected = tab,
-                    onSelect = { tab = it },
-                    onCapture = { if (tab == VaultTab.VIDEOS) onOpenVideoRecorder() else onOpenCamera() },
-                    onImport = { importLauncher.launch(arrayOf("*/*")) }
-                )
+                NavigationBar(containerColor = VaultSurfaceElevated, contentColor = Color.White) {
+                    VaultTab.entries.forEach { t ->
+                        NavigationBarItem(
+                            selected = t == tab,
+                            onClick = { tab = t },
+                            icon = { Icon(imageVector = iconFor(t), contentDescription = t.label) },
+                            label = { Text(t.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = t.accent,
+                                selectedTextColor = t.accent,
+                                unselectedIconColor = Color.White.copy(alpha = 0.5f),
+                                unselectedTextColor = Color.White.copy(alpha = 0.5f),
+                                indicatorColor = t.accent.copy(alpha = 0.15f)
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End,
+        floatingActionButton = {
+            if (!isSelecting) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (tab != VaultTab.FILES) {
+                        FloatingActionButton(
+                            onClick = { if (tab == VaultTab.VIDEOS) onOpenVideoRecorder() else onOpenCamera() },
+                            containerColor = VaultSurfaceElevated,
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = if (tab == VaultTab.VIDEOS) Icons.Filled.Videocam else Icons.Filled.CameraAlt,
+                                contentDescription = "Capture"
+                            )
+                        }
+                    }
+                    FloatingActionButton(
+                        onClick = { importLauncher.launch(arrayOf("*/*")) },
+                        containerColor = tab.accent,
+                        contentColor = Color.White
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Import file")
+                    }
+                }
             }
         }
     ) { padding ->
@@ -230,78 +268,10 @@ fun VaultScreen(
     }
 }
 
-@Composable
-private fun VaultBottomBar(
-    selected: VaultTab,
-    onSelect: (VaultTab) -> Unit,
-    onCapture: () -> Unit,
-    onImport: () -> Unit
-) {
-    BottomAppBar(
-        containerColor = VaultSurfaceElevated,
-        contentColor = Color.White,
-        actions = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                VaultTab.entries.forEach { t ->
-                    BottomTabItem(tab = t, selected = t == selected, onClick = { onSelect(t) })
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                if (selected != VaultTab.FILES) {
-                    IconButton(onClick = onCapture) {
-                        Icon(
-                            imageVector = if (selected == VaultTab.VIDEOS) Icons.Filled.Videocam else Icons.Filled.CameraAlt,
-                            contentDescription = "Capture",
-                            tint = Color.White
-                        )
-                    }
-                }
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onImport,
-                containerColor = selected.accent,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Import file")
-            }
-        }
-    )
-}
-
-@Composable
-private fun BottomTabItem(tab: VaultTab, selected: Boolean, onClick: () -> Unit) {
-    val icon = when (tab) {
-        VaultTab.PHOTOS -> Icons.Filled.Image
-        VaultTab.VIDEOS -> Icons.Filled.Videocam
-        VaultTab.FILES -> Icons.AutoMirrored.Filled.InsertDriveFile
-    }
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            icon,
-            contentDescription = tab.label,
-            tint = if (selected) tab.accent else Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.size(24.dp)
-        )
-        Text(
-            tab.label,
-            color = if (selected) tab.accent else Color.White.copy(alpha = 0.5f),
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            fontSize = 11.sp
-        )
-    }
+private fun iconFor(tab: VaultTab) = when (tab) {
+    VaultTab.PHOTOS -> Icons.Filled.Image
+    VaultTab.VIDEOS -> Icons.Filled.Videocam
+    VaultTab.FILES -> Icons.AutoMirrored.Filled.InsertDriveFile
 }
 
 @Composable

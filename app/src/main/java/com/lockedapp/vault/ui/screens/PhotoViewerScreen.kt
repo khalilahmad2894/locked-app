@@ -11,9 +11,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,6 +33,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.lockedapp.vault.VaultViewModel
 import com.lockedapp.vault.data.VaultItemEntity
+import com.lockedapp.vault.ui.theme.DangerRed
+import com.lockedapp.vault.ui.theme.VaultSurfaceElevated
 import me.saket.telephoto.zoomable.ZoomableContentLocation
 import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
@@ -47,6 +52,7 @@ fun PhotoViewerScreen(
     val pagerState = rememberPagerState(
         initialPage = viewModel.photoViewerStartIndex.coerceIn(0, photos.lastIndex)
     ) { photos.size }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         // HorizontalPager owns the swipe gesture; each page's zoomable Image only
@@ -66,11 +72,7 @@ fun PhotoViewerScreen(
         }
 
         IconButton(
-            onClick = {
-                val current = photos.getOrNull(pagerState.currentPage)
-                current?.let { viewModel.deleteItem(it) }
-                if (photos.size <= 1) onBack()
-            },
+            onClick = { showDeleteConfirm = true },
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
@@ -78,6 +80,26 @@ fun PhotoViewerScreen(
         ) {
             Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White)
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor = VaultSurfaceElevated,
+            title = { Text("Delete this photo?", color = Color.White) },
+            text = { Text("This can't be undone.", color = Color.White.copy(alpha = 0.7f)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val current = photos.getOrNull(pagerState.currentPage)
+                    current?.let { viewModel.deleteItem(it) }
+                    showDeleteConfirm = false
+                    if (photos.size <= 1) onBack()
+                }) { Text("Delete", color = DangerRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = Color.White) }
+            }
+        )
     }
 }
 

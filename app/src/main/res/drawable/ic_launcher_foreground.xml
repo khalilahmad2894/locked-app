@@ -3,7 +3,28 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Lock shackle -->
     <path
+        android:pathData="M41,50 A13,13 0 0 1 67,50"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- Lock body, rounded -->
+    <path
+        android:pathData="M43,50 H65 A8,8 0 0 1 73,58 V72 A8,8 0 0 1 65,80 H43 A8,8 0 0 1 35,72 V58 A8,8 0 0 1 43,50 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Keyhole -->
+    <path
+        android:pathData="M50,63 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z M52,66 L56,66 L55,73 L53,73 Z"
+        android:fillColor="#8B5CF6" />
+    <!-- Cute sparkle accent -->
+    <path
+        android:pathData="M80,21 L82.6,28.4 L90,31 L82.6,33.6 L80,41 L77.4,33.6 L70,31 L77.4,28.4 Z"
+        android:fillColor="#FFD166" />
+    <!-- Tiny secondary sparkle -->
+    <path
+        android:pathData="M27,66 L28.4,70 L32,71.3 L28.4,72.6 L27,76.6 L25.6,72.6 L22,71.3 L25.6,70 Z"
         android:fillColor="#FFFFFF"
-        android:pathData="M54,30 C47,30 41,36 41,43 V48 H38 C35,48 33,50 33,53 V76 C33,79 35,81 38,81 H70 C73,81 75,79 75,76 V53 C75,50 73,48 70,48 H67 V43 C67,36 61,30 54,30 Z M54,37 C58,37 61,40 61,44 V48 H47 V44 C47,40 50,37 54,37 Z" />
+        android:fillAlpha="0.85" />
 </vector>

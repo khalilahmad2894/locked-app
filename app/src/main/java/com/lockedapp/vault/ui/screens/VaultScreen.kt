@@ -1,6 +1,7 @@
 package com.lockedapp.vault.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.togetherWith
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CameraAlt
@@ -34,7 +36,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
@@ -49,11 +54,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,15 +78,18 @@ import com.lockedapp.vault.data.VaultItemEntity
 import com.lockedapp.vault.data.VaultItemType
 import com.lockedapp.vault.ui.theme.DangerRed
 import com.lockedapp.vault.ui.theme.FilesAccent
+import com.lockedapp.vault.ui.theme.NotesAccent
 import com.lockedapp.vault.ui.theme.PhotosAccent
 import com.lockedapp.vault.ui.theme.VaultSurfaceElevated
 import com.lockedapp.vault.ui.theme.VaultVoid
 import com.lockedapp.vault.ui.theme.VideosAccent
+import kotlinx.coroutines.launch
 
 private enum class VaultTab(val label: String, val accent: Color) {
-    PHOTOS("Photos", PhotosAccent),
     VIDEOS("Videos", VideosAccent),
-    FILES("Files", FilesAccent)
+    PHOTOS("Photos", PhotosAccent),
+    FILES("Files", FilesAccent),
+    NOTES("Notes", NotesAccent)
 }
 
 @Composable
@@ -89,12 +99,15 @@ fun VaultScreen(
     onOpenVideo: (VaultItemEntity) -> Unit,
     onOpenDocument: (VaultItemEntity) -> Unit,
     onOpenCamera: () -> Unit,
-    onOpenVideoRecorder: () -> Unit
+    onOpenVideoRecorder: () -> Unit,
+    onOpenNoteEditor: (VaultItemEntity?) -> Unit,
+    onOpenVoiceRecorder: () -> Unit
 ) {
     var tab by remember { mutableStateOf(VaultTab.PHOTOS) }
     val photos by viewModel.photos.collectAsState()
     val videos by viewModel.videos.collectAsState()
     val files by viewModel.files.collectAsState()
+    val notes by viewModel.notes.collectAsState()
 
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -108,6 +121,7 @@ fun VaultScreen(
         VaultTab.PHOTOS -> photos
         VaultTab.VIDEOS -> videos
         VaultTab.FILES -> files
+        VaultTab.NOTES -> notes
     }
 
     fun toggleSelection(id: Long) {
@@ -184,24 +198,51 @@ fun VaultScreen(
         floatingActionButton = {
             if (!isSelecting) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (tab != VaultTab.FILES) {
-                        FloatingActionButton(
-                            onClick = { if (tab == VaultTab.VIDEOS) onOpenVideoRecorder() else onOpenCamera() },
-                            containerColor = VaultSurfaceElevated,
-                            contentColor = Color.White
-                        ) {
-                            Icon(
-                                imageVector = if (tab == VaultTab.VIDEOS) Icons.Filled.Videocam else Icons.Filled.CameraAlt,
-                                contentDescription = "Capture"
-                            )
+                    when (tab) {
+                        VaultTab.PHOTOS, VaultTab.VIDEOS -> {
+                            FloatingActionButton(
+                                onClick = { if (tab == VaultTab.VIDEOS) onOpenVideoRecorder() else onOpenCamera() },
+                                containerColor = VaultSurfaceElevated,
+                                contentColor = Color.White
+                            ) {
+                                Icon(
+                                    imageVector = if (tab == VaultTab.VIDEOS) Icons.Filled.Videocam else Icons.Filled.CameraAlt,
+                                    contentDescription = "Capture"
+                                )
+                            }
+                            FloatingActionButton(
+                                onClick = { importLauncher.launch(arrayOf("*/*")) },
+                                containerColor = tab.accent,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = "Import file")
+                            }
                         }
-                    }
-                    FloatingActionButton(
-                        onClick = { importLauncher.launch(arrayOf("*/*")) },
-                        containerColor = tab.accent,
-                        contentColor = Color.White
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Import file")
+                        VaultTab.FILES -> {
+                            FloatingActionButton(
+                                onClick = { importLauncher.launch(arrayOf("*/*")) },
+                                containerColor = tab.accent,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = "Import file")
+                            }
+                        }
+                        VaultTab.NOTES -> {
+                            FloatingActionButton(
+                                onClick = onOpenVoiceRecorder,
+                                containerColor = VaultSurfaceElevated,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Filled.Mic, contentDescription = "New voice note")
+                            }
+                            FloatingActionButton(
+                                onClick = { onOpenNoteEditor(null) },
+                                containerColor = tab.accent,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Filled.Edit, contentDescription = "New text note")
+                            }
+                        }
                     }
                 }
             }
@@ -212,33 +253,52 @@ fun VaultScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when (tab) {
-                VaultTab.PHOTOS -> PhotosGrid(
-                    items = photos,
-                    viewModel = viewModel,
-                    accent = VaultTab.PHOTOS.accent,
-                    selectedIds = selectedIds,
-                    isSelecting = isSelecting,
-                    onOpen = { index -> onOpenPhoto(index) },
-                    onToggleSelect = ::toggleSelection
-                )
-                VaultTab.VIDEOS -> VideosGrid(
-                    items = videos,
-                    viewModel = viewModel,
-                    accent = VaultTab.VIDEOS.accent,
-                    selectedIds = selectedIds,
-                    isSelecting = isSelecting,
-                    onOpen = onOpenVideo,
-                    onToggleSelect = ::toggleSelection
-                )
-                VaultTab.FILES -> FilesList(
-                    items = files,
-                    accent = VaultTab.FILES.accent,
-                    selectedIds = selectedIds,
-                    isSelecting = isSelecting,
-                    onOpen = onOpenDocument,
-                    onToggleSelect = ::toggleSelection
-                )
+            androidx.compose.animation.AnimatedContent(
+                targetState = tab,
+                label = "tab-content",
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
+                        androidx.compose.animation.scaleIn(initialScale = 0.98f, animationSpec = androidx.compose.animation.core.tween(180)))
+                        .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+                }
+            ) { t ->
+                when (t) {
+                    VaultTab.PHOTOS -> PhotosGrid(
+                        items = photos,
+                        viewModel = viewModel,
+                        accent = VaultTab.PHOTOS.accent,
+                        selectedIds = selectedIds,
+                        isSelecting = isSelecting,
+                        onOpen = { index -> onOpenPhoto(index) },
+                        onToggleSelect = ::toggleSelection
+                    )
+                    VaultTab.VIDEOS -> VideosGrid(
+                        items = videos,
+                        viewModel = viewModel,
+                        accent = VaultTab.VIDEOS.accent,
+                        selectedIds = selectedIds,
+                        isSelecting = isSelecting,
+                        onOpen = onOpenVideo,
+                        onToggleSelect = ::toggleSelection
+                    )
+                    VaultTab.FILES -> FilesList(
+                        items = files,
+                        accent = VaultTab.FILES.accent,
+                        selectedIds = selectedIds,
+                        isSelecting = isSelecting,
+                        onOpen = onOpenDocument,
+                        onToggleSelect = ::toggleSelection
+                    )
+                    VaultTab.NOTES -> NotesList(
+                        items = notes,
+                        viewModel = viewModel,
+                        accent = VaultTab.NOTES.accent,
+                        selectedIds = selectedIds,
+                        isSelecting = isSelecting,
+                        onOpenNote = onOpenNoteEditor,
+                        onToggleSelect = ::toggleSelection
+                    )
+                }
             }
         }
     }
@@ -272,6 +332,7 @@ private fun iconFor(tab: VaultTab) = when (tab) {
     VaultTab.PHOTOS -> Icons.Filled.Image
     VaultTab.VIDEOS -> Icons.Filled.Videocam
     VaultTab.FILES -> Icons.AutoMirrored.Filled.InsertDriveFile
+    VaultTab.NOTES -> Icons.AutoMirrored.Filled.Notes
 }
 
 @Composable
@@ -285,7 +346,7 @@ private fun PhotosGrid(
     onToggleSelect: (Long) -> Unit
 ) {
     if (items.isEmpty()) {
-        EmptyState(accent = accent, text = "No photos yet\nTap + to add one")
+        EmptyState(accent = accent, icon = Icons.Filled.Image, text = "No photos yet\nTap + to add one")
         return
     }
     LazyVerticalGrid(
@@ -322,7 +383,7 @@ private fun VideosGrid(
     onToggleSelect: (Long) -> Unit
 ) {
     if (items.isEmpty()) {
-        EmptyState(accent = accent, text = "No videos yet\nTap + to add one")
+        EmptyState(accent = accent, icon = Icons.Filled.Videocam, text = "No videos yet\nTap + to add one")
         return
     }
     LazyVerticalGrid(
@@ -426,7 +487,7 @@ private fun FilesList(
     onToggleSelect: (Long) -> Unit
 ) {
     if (items.isEmpty()) {
-        EmptyState(accent = accent, text = "No files yet\nTap + to add one")
+        EmptyState(accent = accent, icon = Icons.AutoMirrored.Filled.InsertDriveFile, text = "No files yet\nTap + to add one")
         return
     }
     LazyColumn(
@@ -498,16 +559,148 @@ private fun FilesList(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun EmptyState(accent: Color, text: String) {
+private fun NotesList(
+    items: List<VaultItemEntity>,
+    viewModel: VaultViewModel,
+    accent: Color,
+    selectedIds: Set<Long>,
+    isSelecting: Boolean,
+    onOpenNote: (VaultItemEntity?) -> Unit,
+    onToggleSelect: (Long) -> Unit
+) {
+    if (items.isEmpty()) {
+        EmptyState(accent = accent, icon = Icons.AutoMirrored.Filled.Notes, text = "No notes yet\nTap the pencil or mic to add one")
+        return
+    }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val player = remember { androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
+    var playingId by remember { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(Unit) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == androidx.media3.common.Player.STATE_ENDED) playingId = null
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.release() }
+    }
+
+    fun toggleVoicePlayback(item: VaultItemEntity) {
+        if (playingId == item.id) {
+            player.pause()
+            playingId = null
+        } else {
+            scope.launch {
+                val uri = viewModel.openForViewing(item)
+                player.setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
+                player.prepare()
+                player.play()
+                playingId = item.id
+            }
+        }
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(items, key = { it.id }) { item ->
+            val isSelected = item.id in selectedIds
+            val isVoice = item.type == VaultItemType.VOICE_NOTE
+            val isPlaying = isVoice && playingId == item.id
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (isSelected) accent.copy(alpha = 0.18f) else VaultSurfaceElevated)
+                    .combinedClickable(
+                        onClick = {
+                            when {
+                                isSelecting -> onToggleSelect(item.id)
+                                isVoice -> toggleVoicePlayback(item)
+                                else -> onOpenNote(item)
+                            }
+                        },
+                        onLongClick = { onToggleSelect(item.id) }
+                    )
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(accent.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelecting) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) accent else Color.White.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(Icons.Filled.Check, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    } else {
+                        Icon(
+                            imageVector = when {
+                                isVoice && isPlaying -> Icons.Filled.Pause
+                                isVoice -> Icons.Filled.PlayArrow
+                                else -> Icons.Filled.Edit
+                            },
+                            contentDescription = null,
+                            tint = accent
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(
+                        item.displayName,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        if (isVoice) "Voice note" else "Text note",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(accent: Color, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, text: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.15f))
-            )
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(accent.copy(alpha = 0.25f), accent.copy(alpha = 0.08f))
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (icon != null) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
+                }
+            }
             Text(
                 text,
                 color = Color.White.copy(alpha = 0.5f),

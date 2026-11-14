@@ -111,6 +111,77 @@ class VaultRepository(private val context: Context) {
         item.copy(id = id)
     }
 
+    /** Creates a new text note, or overwrites [existing]'s content in place (same id, new backing file). */
+    suspend fun saveTextNote(existing: VaultItemEntity?, content: String): VaultItemEntity =
+        withContext(Dispatchers.IO) {
+            val bytes = content.toByteArray(Charsets.UTF_8)
+            val storedFileName = UUID.randomUUID().toString()
+            CryptoManager.encryptedFile(context, File(vaultDir, storedFileName)).openFileOutput().use { out ->
+                out.write(bytes)
+            }
+
+            val title = content.lineSequence().firstOrNull { it.isNotBlank() }
+                ?.take(40)?.trim()
+                ?.ifBlank { null }
+                ?: "Note_${System.currentTimeMillis()}"
+
+            if (existing != null) {
+                File(vaultDir, existing.storedFileName).delete()
+                val updated = existing.copy(
+                    displayName = title,
+                    storedFileName = storedFileName,
+                    sizeBytes = bytes.size.toLong(),
+                    dateAdded = System.currentTimeMillis()
+                )
+                dao.update(updated)
+                updated
+            } else {
+                val item = VaultItemEntity(
+                    displayName = title,
+                    mimeType = "text/plain",
+                    storedFileName = storedFileName,
+                    type = VaultItemType.TEXT_NOTE,
+                    sizeBytes = bytes.size.toLong(),
+                    dateAdded = System.currentTimeMillis()
+                )
+                val id = dao.insert(item)
+                item.copy(id = id)
+            }
+        }
+
+    suspend fun readTextNote(item: VaultItemEntity): String = withContext(Dispatchers.IO) {
+        val source = File(vaultDir, item.storedFileName)
+        if (!source.exists()) return@withContext ""
+        val bytes = CryptoManager.encryptedFile(context, source).openFileInput().use { it.readBytes() }
+        String(bytes, Charsets.UTF_8)
+    }
+
+    /** Same rationale as [newPrivateVideoTempFile] — MediaRecorder needs a seekable File. */
+    fun newPrivateVoiceTempFile(): File {
+        val dir = File(context.filesDir, "voice_tmp").apply { mkdirs() }
+        return File(dir, "${UUID.randomUUID()}.m4a")
+    }
+
+    suspend fun importCapturedVoiceNote(tempFile: File): VaultItemEntity = withContext(Dispatchers.IO) {
+        val storedFileName = UUID.randomUUID().toString()
+        CryptoManager.encryptedFile(context, File(vaultDir, storedFileName)).openFileOutput().use { out ->
+            tempFile.inputStream().use { input -> input.copyTo(out) }
+        }
+        val size = tempFile.length()
+        tempFile.delete()
+
+        val item = VaultItemEntity(
+            displayName = "Voice note ${System.currentTimeMillis()}",
+            mimeType = "audio/mp4",
+            storedFileName = storedFileName,
+            type = VaultItemType.VOICE_NOTE,
+            sizeBytes = size,
+            dateAdded = System.currentTimeMillis()
+        )
+        val id = dao.insert(item)
+        item.copy(id = id)
+    }
+
     suspend fun deleteItem(item: VaultItemEntity) = withContext(Dispatchers.IO) {
         File(vaultDir, item.storedFileName).delete()
         dao.delete(item)

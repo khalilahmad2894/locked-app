@@ -19,6 +19,7 @@ val AuroraGreen = Color(0xFF34D399)
 val PhotosAccent = Color(0xFF38BDF8)
 val VideosAccent = Color(0xFFEC4899)
 val FilesAccent = Color(0xFFFB923C)
+val NotesAccent = Color(0xFF34D399)
 
 val TextPrimary = Color(0xFFF5F3FA)
 val TextSecondary = Color(0xFFA29CB5)

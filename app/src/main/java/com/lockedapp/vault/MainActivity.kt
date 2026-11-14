@@ -13,12 +13,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.lockedapp.vault.ui.screens.CameraCaptureScreen
+import com.lockedapp.vault.ui.screens.NoteEditorScreen
 import com.lockedapp.vault.ui.screens.PhotoViewerScreen
 import com.lockedapp.vault.ui.screens.SetupPinScreen
 import com.lockedapp.vault.ui.screens.UnlockScreen
 import com.lockedapp.vault.ui.screens.VaultScreen
 import com.lockedapp.vault.ui.screens.VideoPlayerScreen
 import com.lockedapp.vault.ui.screens.VideoRecordScreen
+import com.lockedapp.vault.ui.screens.VoiceNoteRecordScreen
 import com.lockedapp.vault.ui.theme.LockedVaultTheme
 import kotlinx.coroutines.launch
 
@@ -84,7 +86,12 @@ private fun VaultApp(viewModel: VaultViewModel) {
                     }
                 },
                 onOpenCamera = { navController.navigate("camera") },
-                onOpenVideoRecorder = { navController.navigate("videoRecorder") }
+                onOpenVideoRecorder = { navController.navigate("videoRecorder") },
+                onOpenNoteEditor = { note ->
+                    viewModel.activeNoteItem = note
+                    navController.navigate("noteEditor")
+                },
+                onOpenVoiceRecorder = { navController.navigate("voiceRecorder") }
             )
         }
         composable("camera") {
@@ -92,6 +99,12 @@ private fun VaultApp(viewModel: VaultViewModel) {
         }
         composable("videoRecorder") {
             VideoRecordScreen(viewModel = viewModel, onDone = { navController.popBackStack() })
+        }
+        composable("noteEditor") {
+            NoteEditorScreen(viewModel = viewModel, onDone = { navController.popBackStack() })
+        }
+        composable("voiceRecorder") {
+            VoiceNoteRecordScreen(viewModel = viewModel, onDone = { navController.popBackStack() })
         }
         composable("photoViewer") {
             PhotoViewerScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

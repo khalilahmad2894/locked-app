@@ -40,9 +40,14 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val notes: StateFlow<List<VaultItemEntity>> = items
+        .map { list -> list.filter { it.type == VaultItemType.TEXT_NOTE || it.type == VaultItemType.VOICE_NOTE } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     /** Shared with PhotoViewerScreen so it doesn't need the full list passed through nav args. */
     var photoViewerStartIndex: Int = 0
     var activeVideoItem: VaultItemEntity? = null
+    var activeNoteItem: VaultItemEntity? = null
 
     fun importFile(uri: Uri) {
         viewModelScope.launch {
@@ -63,6 +68,19 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             repository.importCapturedVideo(tempFile)
         }
     }
+
+    fun newPrivateVoiceTempFile() = repository.newPrivateVoiceTempFile()
+
+    fun importCapturedVoiceNote(tempFile: java.io.File) {
+        viewModelScope.launch {
+            repository.importCapturedVoiceNote(tempFile)
+        }
+    }
+
+    suspend fun saveTextNote(existing: VaultItemEntity?, content: String): VaultItemEntity =
+        repository.saveTextNote(existing, content)
+
+    suspend fun readTextNote(item: VaultItemEntity): String = repository.readTextNote(item)
 
     fun deleteItem(item: VaultItemEntity) {
         ThumbnailCache.remove(item.id)

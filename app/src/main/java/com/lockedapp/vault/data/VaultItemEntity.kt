@@ -3,7 +3,7 @@ package com.lockedapp.vault.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-enum class VaultItemType { IMAGE, VIDEO, AUDIO, DOCUMENT, OTHER }
+enum class VaultItemType { IMAGE, VIDEO, AUDIO, DOCUMENT, OTHER, TEXT_NOTE, VOICE_NOTE }
 
 @Entity(tableName = "vault_items")
 data class VaultItemEntity(

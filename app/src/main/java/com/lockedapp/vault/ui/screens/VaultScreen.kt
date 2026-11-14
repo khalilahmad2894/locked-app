@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -52,7 +53,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,7 +86,6 @@ import com.lockedapp.vault.ui.theme.PhotosAccent
 import com.lockedapp.vault.ui.theme.VaultSurfaceElevated
 import com.lockedapp.vault.ui.theme.VaultVoid
 import com.lockedapp.vault.ui.theme.VideosAccent
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class VaultTab(val label: String, val accent: Color) {
@@ -562,7 +562,7 @@ private fun FilesList(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun NotesList(
     items: List<VaultItemEntity>,
@@ -607,12 +607,14 @@ private fun NotesList(
         onDispose { player.release() }
     }
 
-    // Polls the real playback position while something is loaded, but backs off
-    // while the user is dragging the slider so the thumb doesn't jump around.
+    // Synced to the display's own refresh signal (not a fixed delay) so the dot travels
+    // smoothly frame-to-frame instead of visibly hopping every poll interval. Backs off
+    // while the user is dragging the slider so the thumb doesn't fight the touch.
     LaunchedEffect(activeNoteId) {
         while (activeNoteId != null) {
-            if (isPlayingNow && !isDragging) positionMs = player.currentPosition
-            delay(200)
+            withFrameMillis {
+                if (isPlayingNow && !isDragging) positionMs = player.currentPosition
+            }
         }
     }
 
@@ -720,11 +722,38 @@ private fun NotesList(
                                 player.seekTo(positionMs)
                                 isDragging = false
                             },
-                            colors = SliderDefaults.colors(
-                                thumbColor = accent,
-                                activeTrackColor = accent,
-                                inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-                            ),
+                            track = { sliderState ->
+                                val range = sliderState.valueRange.endInclusive - sliderState.valueRange.start
+                                val fraction = if (range > 0f) {
+                                    ((sliderState.value - sliderState.valueRange.start) / range).coerceIn(0f, 1f)
+                                } else 0f
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .align(Alignment.CenterStart)
+                                            .clip(RoundedCornerShape(1.dp))
+                                            .background(Color.White.copy(alpha = 0.25f))
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(fraction)
+                                            .height(2.dp)
+                                            .align(Alignment.CenterStart)
+                                            .clip(RoundedCornerShape(1.dp))
+                                            .background(accent)
+                                    )
+                                }
+                            },
+                            thumb = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(11.dp)
+                                        .clip(CircleShape)
+                                        .background(accent)
+                                )
+                            },
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                         )
                         Text(formatDuration(durationMs), color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
